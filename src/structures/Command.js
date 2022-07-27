@@ -50,7 +50,7 @@ export class Command {
 	 * @param {object} options All options
 	 */
 	constructor(options) {
-		this.$options = options
+		this.#options = options
 		this.execute = this.#options.execute.bind(this)
 		this.#build()
 	}
@@ -71,8 +71,8 @@ export class Command {
 		this.command.setName(this.name)
 		this.command.setDescription(this.description)
 
-		if (this.#options) {
-			this.#options.forEach(optionConfig => {
+		if (this.options) {
+			this.options.forEach(optionConfig => {
 				const optionHandler = `add${capitalise(optionConfig.type)}Option`
 
 				this.command[optionHandler](option => {
