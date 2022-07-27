@@ -5,6 +5,8 @@ import {
 	Client,
 	Intents,
 } from 'discord.js'
+import { REST as DiscordRESTAPI } from '@discordjs/rest'
+import { Routes as DiscordRoutes } from 'discord-api-types/v9'
 
 
 
@@ -19,7 +21,11 @@ import { logger } from '../helpers/logger.js'
 
 
 
-const { DISCORD_TOKEN } = process.env
+const {
+	DISCORD_CLIENT_ID,
+	DISCORD_GUILD_ID,
+	DISCORD_TOKEN,
+} = process.env
 
 
 
@@ -43,6 +49,9 @@ class BotClass {
 			'REACTION',
 		],
 	})
+
+	#restClient = new DiscordRESTAPI({ version: '9' })
+		.setToken(DISCORD_TOKEN)
 
 
 
@@ -76,6 +85,27 @@ class BotClass {
 		this.#client.on('messageReactionRemove', this.#handleMessageReactionRemove)
 
 		this.#client.once('ready', this.#handleReady)
+	}
+
+	/**
+	 * Retrieves all commands currently registered for this bot on the guild.
+	 *
+	 * @returns {object} An object of command names and IDs.
+	 */
+	async #getCurrentCommands() {
+		const route = DiscordRoutes.applicationGuildCommands(DISCORD_CLIENT_ID, DISCORD_GUILD_ID)
+
+		try {
+			const response = await this.#restClient.get(route)
+			return response.reduce((accumulator, command) => {
+				accumulator[command.name] = command.id
+				return accumulator
+			}, {})
+		} catch (error) {
+			logger.error(`Unable to get application commands for guild ${DISCORD_GUILD_ID}`)
+			logger.error(error)
+			return {}
+		}
 	}
 
 	/**
@@ -169,6 +199,56 @@ class BotClass {
 		logger.info('Discord Client is ready.')
 	}
 
+	/**
+	 * Registers slash commands with Discord.
+	 */
+	async #registerCommands() {
+		// Generate the API route for updating bot commands.
+		const route = DiscordRoutes.applicationGuildCommands(DISCORD_CLIENT_ID, DISCORD_GUILD_ID)
+
+		// Sends a PUT request to the Discord API to create our search command.
+		await this.#restClient.put(route, {
+			body: Object.values(commands).map(({ command }) => command.toJSON()),
+		})
+	}
+
+	/**
+	 * Unregisters old commands.
+	 */
+	async #unregisterStaleCommands() {
+		const registeredCommands = await this.#getCurrentCommands()
+
+		const newCommandNames = Object.keys(commands)
+
+		const commandsToDelete = Object
+			.entries(registeredCommands)
+			.reduce((accumulator, [name, id]) => {
+				if (!newCommandNames.includes(name)) {
+					accumulator.push([id, name])
+				}
+
+				return accumulator
+			}, [])
+
+		let commandDeleteIndex = 0
+		while (commandDeleteIndex < commandsToDelete.length) {
+			const [
+				id,
+				name,
+			] = commandsToDelete[commandDeleteIndex]
+
+			try {
+				await	this.#restClient.delete(DiscordRoutes.applicationGuildCommand(DISCORD_CLIENT_ID, DISCORD_GUILD_ID, id))
+				logger.log(`Deleted command ${name} (${id}) (reason: unused)`)
+			} catch (error) {
+				logger.error(`Unable to delete ${name} command`)
+				logger.error(error)
+			}
+
+			commandDeleteIndex += 1
+		}
+	}
+
 
 
 
@@ -182,6 +262,8 @@ class BotClass {
 	 */
 	start() {
 		this.#client.login(DISCORD_TOKEN)
+		this.#unregisterStaleCommands()
+		this.#registerCommands()
 	}
 }
 

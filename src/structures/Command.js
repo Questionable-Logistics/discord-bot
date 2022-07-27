@@ -21,6 +21,8 @@ export class Command {
 	 * Private instance properties
 	\****************************************************************************/
 
+	#command = {}
+
 	#options = {}
 
 
@@ -30,8 +32,6 @@ export class Command {
 	/****************************************************************************\
 	 * Public instance properties
 	\****************************************************************************/
-
-	command = null
 
 	// eslint-disable-next-line jsdoc/require-jsdoc
 	execute = () => logger.error('No execution method set.')
@@ -67,15 +67,15 @@ export class Command {
 	 * Builds the command.
 	 */
 	#build() {
-		this.command = new SlashCommandBuilder
-		this.command.setName(this.name)
-		this.command.setDescription(this.description)
+		this.#command = new SlashCommandBuilder
+		this.#command.setName(this.name)
+		this.#command.setDescription(this.description)
 
 		if (this.options) {
 			this.options.forEach(optionConfig => {
 				const optionHandler = `add${capitalise(optionConfig.type)}Option`
 
-				this.command[optionHandler](option => {
+				this.#command[optionHandler](option => {
 					option.setName(optionConfig.name)
 					option.setDescription(optionConfig.description)
 
@@ -102,6 +102,13 @@ export class Command {
 	/****************************************************************************\
 	 * Getters
 	\****************************************************************************/
+
+	/**
+	 * @returns {string} The description that will be shown in Discord's autocomplete.
+	 */
+	get command() {
+		return this.#command
+	}
 
 	/**
 	 * @returns {string} The description that will be shown in Discord's autocomplete.
