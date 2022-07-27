@@ -33,6 +33,8 @@ export default new Command({
 	 * @param {import('discord-api-types').interaction} interaction The interaction object.
 	 */
 	async execute(interaction) {
+		interaction.deferReply()
+
 		const query = interaction.options.getString('query')
 
 		const magicResponse = await fetch(`https://8ball.delegator.com/magic/JSON/${query}`)
@@ -67,6 +69,6 @@ export default new Command({
 			text: query.slice(0, 2048),
 		})
 
-		await interaction.reply({ embeds: [response] })
+		await interaction.editReply({ embeds: [response] })
 	},
 })
